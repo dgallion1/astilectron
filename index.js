@@ -2,7 +2,16 @@
 'use strict'
 
 const electron = require('electron')
-const {app, BrowserWindow, ipcMain, Menu, MenuItem, Tray, dialog, Notification} = electron
+const {
+    app,
+    BrowserWindow,
+    ipcMain,
+    Menu,
+    MenuItem,
+    Tray,
+    dialog,
+    Notification
+} = electron
 const consts = require('./src/consts.js')
 const client = require('./src/client.js')
 const readline = require('readline')
@@ -32,23 +41,42 @@ function onReady () {
 
     // Listen to screen events
     screen.on('display-added', function() {
-        client.write(consts.targetIds.app, consts.eventNames.displayEventAdded, {displays: {all: screen.getAllDisplays(), primary: screen.getPrimaryDisplay()}})
+        client.write(consts.targetIds.app, consts.eventNames.displayEventAdded, {
+            displays: {
+                all: screen.getAllDisplays(),
+                primary: screen.getPrimaryDisplay()
+            }
+        })
     })
     screen.on('display-metrics-changed', function() {
-        client.write(consts.targetIds.app, consts.eventNames.displayEventMetricsChanged, {displays: {all: screen.getAllDisplays(), primary: screen.getPrimaryDisplay()}})
+        client.write(consts.targetIds.app, consts.eventNames.displayEventMetricsChanged, {
+            displays: {
+                all: screen.getAllDisplays(),
+                primary: screen.getPrimaryDisplay()
+            }
+        })
     })
     screen.on('display-removed', function() {
-        client.write(consts.targetIds.app, consts.eventNames.displayEventRemoved, {displays: {all: screen.getAllDisplays(), primary: screen.getPrimaryDisplay()}})
+        client.write(consts.targetIds.app, consts.eventNames.displayEventRemoved, {
+            displays: {
+                all: screen.getAllDisplays(),
+                primary: screen.getPrimaryDisplay()
+            }
+        })
     })
 
     // Listen on main ipcMain
     ipcMain.on(consts.eventNames.ipcEventMessage, (event, arg) => {
-        let payload = {message: arg.message};
+        let payload = {
+            message: arg.message
+        };
         if (typeof arg.callbackId !== "undefined") payload.callbackId = arg.callbackId;
         client.write(arg.targetID, consts.eventNames.windowEventMessage, payload)
     });
     ipcMain.on(consts.eventNames.ipcEventMessageCallback, (event, arg) => {
-        let payload = {message: arg.message};
+        let payload = {
+            message: arg.message
+        };
         if (typeof arg.callbackId !== "undefined") payload.callbackId = arg.callbackId;
         client.write(arg.targetID, consts.eventNames.windowEventMessageCallback, payload)
     });
@@ -62,6 +90,44 @@ function onReady () {
         let window;
         switch (json.name) {
             // App
+            case consts.eventNames.dialog: {
+                let cmd = JSON.parse(json.code)
+                const options = {
+                    type: 'question',
+                    buttons: ['Cancel', 'Yes, please', 'No, thanks'],
+                    defaultId: 2,
+                    title: 'Question',
+                    message: JSON.stringify(cmd),
+                    detail: 'It does not really matter',
+                    checkboxLabel: 'Remember my answer',
+                    checkboxChecked: true,
+                };
+                switch (cmd["dialog"]) {
+                    case "showOpenDialog": {
+                        dialog.showOpenDialog(cmd).then(function(v) {
+                            client.write(json.targetID, consts.eventNames.windowEventMessage, {
+                                message: {
+                                    Name: "DialogResp",
+                                    Payload: v
+                                }
+                            });
+                        })
+                    }
+                    break;
+                case "showSaveDialog": {
+                    dialog.showSaveDialog(cmd).then(function(v) {
+                        client.write(json.targetID, consts.eventNames.windowEventMessage, {
+                            message: {
+                                Name: "DialogResp",
+                                Payload: v
+                            }
+                        });
+                    })
+                }
+                break;
+                }
+            }
+            break;
             case consts.eventNames.appCmdQuit:
             app.quit();
             break;
@@ -72,7 +138,9 @@ function onReady () {
             if (typeof app.dock !== "undefined") {
                 id = app.dock.bounce(json.bounceType);
             }
-            client.write(consts.targetIds.dock, consts.eventNames.dockEventBouncing, {id: id});
+            client.write(consts.targetIds.dock, consts.eventNames.dockEventBouncing, {
+                id: id
+            });
             break;
             case consts.eventNames.dockCmdBounceDownloads:
             if (typeof app.dock !== "undefined") {
@@ -250,7 +318,9 @@ function onReady () {
             break;
             case consts.eventNames.windowCmdMessage:
             case consts.eventNames.windowCmdMessageCallback:
-            let m = {message: json.message}
+            let m = {
+                message: json.message
+            }
             if (typeof json.callbackId !== "undefined") m.callbackId = json.callbackId
             const targetElement = elements[json.targetID]
             if (targetElement) targetElement.webContents.send(json.name === consts.eventNames.windowCmdMessageCallback ? consts.eventNames.ipcCmdMessageCallback : consts.eventNames.ipcCmdMessage, m)
@@ -314,7 +384,9 @@ function onReady () {
 // start begins listening to go-astilectron.
 function start(address = process.argv[2]) {
     client.init(address);
-    rl = readline.createInterface({ input: client.socket });
+    rl = readline.createInterface({
+        input: client.socket
+    });
 
     app.on("before-quit", beforeQuit);
     if (app.isReady()) {
@@ -341,7 +413,9 @@ function menuCreate(menu) {
 function menuItemCreate(menuItem) {
     const itemId = menuItem.id
     menuItem.options.click = function(menuItem) {
-        client.write(itemId, consts.eventNames.menuItemEventClicked, {menuItemOptions: menuItemToJSON(menuItem)})
+        client.write(itemId, consts.eventNames.menuItemEventClicked, {
+            menuItemOptions: menuItemToJSON(menuItem)
+        })
     }
     if (typeof menuItem.submenu !== "undefined") {
         menuItem.options.type = 'submenu'
@@ -382,11 +456,25 @@ function setMenu(rootId) {
 function notificationCreate(json) {
     if (Notification.isSupported()) {
         elements[json.targetID] = new Notification(json.notificationOptions);
-        elements[json.targetID].on('action', (event, index) => { client.write(json.targetID, consts.eventNames.notificationEventActioned, {index: index}) })
-        elements[json.targetID].on('click', () => { client.write(json.targetID, consts.eventNames.notificationEventClicked) })
-        elements[json.targetID].on('close', () => { client.write(json.targetID, consts.eventNames.notificationEventClosed) })
-        elements[json.targetID].on('reply', (event, reply) => { client.write(json.targetID, consts.eventNames.notificationEventReplied, {reply: reply}) })
-        elements[json.targetID].on('show', () => { client.write(json.targetID, consts.eventNames.notificationEventShown) })
+        elements[json.targetID].on('action', (event, index) => {
+            client.write(json.targetID, consts.eventNames.notificationEventActioned, {
+                index: index
+            })
+        })
+        elements[json.targetID].on('click', () => {
+            client.write(json.targetID, consts.eventNames.notificationEventClicked)
+        })
+        elements[json.targetID].on('close', () => {
+            client.write(json.targetID, consts.eventNames.notificationEventClosed)
+        })
+        elements[json.targetID].on('reply', (event, reply) => {
+            client.write(json.targetID, consts.eventNames.notificationEventReplied, {
+                reply: reply
+            })
+        })
+        elements[json.targetID].on('show', () => {
+            client.write(json.targetID, consts.eventNames.notificationEventShown)
+        })
     }
     client.write(json.targetID, consts.eventNames.notificationEventCreated)
 }
@@ -397,9 +485,36 @@ function trayCreate(json) {
     if (typeof json.trayOptions.tooltip !== "undefined") {
         elements[json.targetID].setToolTip(json.trayOptions.tooltip);
     }
-    elements[json.targetID].on('click', (index, event) => { client.write(json.targetID, consts.eventNames.trayEventClicked, {"bounds":{x:event.x, y:event.y,width:event.width,height:event.height}})})
-    elements[json.targetID].on('double-click', (index, event) => { client.write(json.targetID, consts.eventNames.trayEventDoubleClicked, {"bounds":{x:event.x, y:event.y,width:event.width,height:event.height}})})
-    elements[json.targetID].on('right-click', (index, event) => { client.write(json.targetID, consts.eventNames.trayEventRightClicked, {"bounds":{x:event.x, y:event.y,width:event.width,height:event.height}})})
+    elements[json.targetID].on('click', (index, event) => {
+        client.write(json.targetID, consts.eventNames.trayEventClicked, {
+            "bounds": {
+                x: event.x,
+                y: event.y,
+                width: event.width,
+                height: event.height
+            }
+        })
+    })
+    elements[json.targetID].on('double-click', (index, event) => {
+        client.write(json.targetID, consts.eventNames.trayEventDoubleClicked, {
+            "bounds": {
+                x: event.x,
+                y: event.y,
+                width: event.width,
+                height: event.height
+            }
+        })
+    })
+    elements[json.targetID].on('right-click', (index, event) => {
+        client.write(json.targetID, consts.eventNames.trayEventRightClicked, {
+            "bounds": {
+                x: event.x,
+                y: event.y,
+                width: event.width,
+                height: event.height
+            }
+        })
+    })
     client.write(json.targetID, consts.eventNames.trayEventCreated)
 }
 
@@ -424,7 +539,9 @@ function windowCreate(json) {
 function windowCreateFinish(json) {
     elements[json.targetID].setMenu(null)
     elements[json.targetID].loadURL(json.url, (typeof json.windowOptions.load !== "undefined" ? json.windowOptions.load :  {}));
-    elements[json.targetID].on('blur', () => { client.write(json.targetID, consts.eventNames.windowEventBlur) })
+    elements[json.targetID].on('blur', () => {
+        client.write(json.targetID, consts.eventNames.windowEventBlur)
+    })
     elements[json.targetID].on('close', (e) => {
         if (typeof windowOptions[json.targetID] !== "undefined" && typeof windowOptions[json.targetID].custom !== "undefined") {
             if (typeof windowOptions[json.targetID].custom.messageBoxOnClose !== "undefined") {
@@ -449,18 +566,42 @@ function windowCreateFinish(json) {
         client.write(json.targetID, consts.eventNames.windowEventClosed)
         delete elements[json.targetID]
     })
-    elements[json.targetID].on('focus', () => { client.write(json.targetID, consts.eventNames.windowEventFocus) })
-    elements[json.targetID].on('hide', () => { client.write(json.targetID, consts.eventNames.windowEventHide) })
-    elements[json.targetID].on('maximize', () => { client.write(json.targetID, consts.eventNames.windowEventMaximize) })
-    elements[json.targetID].on('minimize', () => { client.write(json.targetID, consts.eventNames.windowEventMinimize) })
-    elements[json.targetID].on('move', () => { client.write(json.targetID, consts.eventNames.windowEventMove) })
-    elements[json.targetID].on('ready-to-show', () => { client.write(json.targetID, consts.eventNames.windowEventReadyToShow) })
-    elements[json.targetID].on('resize', () => { client.write(json.targetID, consts.eventNames.windowEventResize) })
-    elements[json.targetID].on('resize-content', () => { client.write(json.targetID, consts.eventNames.windowEventResizeContent) })
-    elements[json.targetID].on('restore', () => { client.write(json.targetID, consts.eventNames.windowEventRestore) })
-    elements[json.targetID].on('show', () => { client.write(json.targetID, consts.eventNames.windowEventShow) })
-    elements[json.targetID].on('unmaximize', () => { client.write(json.targetID, consts.eventNames.windowEventUnmaximize) })
-    elements[json.targetID].on('unresponsive', () => { client.write(json.targetID, consts.eventNames.windowEventUnresponsive) })
+    elements[json.targetID].on('focus', () => {
+        client.write(json.targetID, consts.eventNames.windowEventFocus)
+    })
+    elements[json.targetID].on('hide', () => {
+        client.write(json.targetID, consts.eventNames.windowEventHide)
+    })
+    elements[json.targetID].on('maximize', () => {
+        client.write(json.targetID, consts.eventNames.windowEventMaximize)
+    })
+    elements[json.targetID].on('minimize', () => {
+        client.write(json.targetID, consts.eventNames.windowEventMinimize)
+    })
+    elements[json.targetID].on('move', () => {
+        client.write(json.targetID, consts.eventNames.windowEventMove)
+    })
+    elements[json.targetID].on('ready-to-show', () => {
+        client.write(json.targetID, consts.eventNames.windowEventReadyToShow)
+    })
+    elements[json.targetID].on('resize', () => {
+        client.write(json.targetID, consts.eventNames.windowEventResize)
+    })
+    elements[json.targetID].on('resize-content', () => {
+        client.write(json.targetID, consts.eventNames.windowEventResizeContent)
+    })
+    elements[json.targetID].on('restore', () => {
+        client.write(json.targetID, consts.eventNames.windowEventRestore)
+    })
+    elements[json.targetID].on('show', () => {
+        client.write(json.targetID, consts.eventNames.windowEventShow)
+    })
+    elements[json.targetID].on('unmaximize', () => {
+        client.write(json.targetID, consts.eventNames.windowEventUnmaximize)
+    })
+    elements[json.targetID].on('unresponsive', () => {
+        client.write(json.targetID, consts.eventNames.windowEventUnresponsive)
+    })
     elements[json.targetID].webContents.on('did-finish-load', () => {
         elements[json.targetID].webContents.executeJavaScript(
             `const {ipcRenderer} = require('electron')
@@ -470,12 +611,12 @@ function windowCreateFinish(json) {
                     if (astilectron.onMessageOnce) {
                         return
                     }
-                    ipcRenderer.on('`+ consts.eventNames.ipcCmdMessage +`', function(event, message) {
+                    ipcRenderer.on('` + consts.eventNames.ipcCmdMessage + `', function(event, message) {
                         let v = callback(message.message)
                         if (typeof message.callbackId !== "undefined") {
-                            let e = {callbackId: message.callbackId, targetID: '`+ json.targetID +`'}
+                            let e = {callbackId: message.callbackId, targetID: '` + json.targetID + `'}
                             if (typeof v !== "undefined") e.message = v
-                            ipcRenderer.send('`+ consts.eventNames.ipcEventMessageCallback +`', e)
+                            ipcRenderer.send('` + consts.eventNames.ipcEventMessageCallback + `', e)
                         }
                     })
                     astilectron.onMessageOnce = true
@@ -483,7 +624,7 @@ function windowCreateFinish(json) {
                 callbacks: {},
                 counters: {},
                 registerCallback: function(k, e, c, n) {
-                    e.targetID = '`+ json.targetID +`';
+                    e.targetID = '` + json.targetID + `';
                     if (typeof c !== "undefined") {
                         if (typeof astilectron.counters[k] === "undefined") {
                             astilectron.counters[k] = 1;
@@ -502,13 +643,13 @@ function windowCreateFinish(json) {
                     }
                 },
                 sendMessage: function(message, callback) {
-                    astilectron.registerCallback('` + consts.callbackNames.webContentsMessage + `', {message: message}, callback, '`+ consts.eventNames.ipcEventMessage +`');
+                    astilectron.registerCallback('` + consts.callbackNames.webContentsMessage + `', {message: message}, callback, '` + consts.eventNames.ipcEventMessage + `');
                 }
             };
-            ipcRenderer.on('`+ consts.eventNames.ipcCmdMessageCallback +`', function(event, message) {
+            ipcRenderer.on('` + consts.eventNames.ipcCmdMessageCallback + `', function(event, message) {
                 astilectron.executeCallback('` + consts.callbackNames.webContentsMessage + `', message, [message.message]);
             });
-            ipcRenderer.on('`+ consts.eventNames.ipcCmdLog+`', function(event, message) {
+            ipcRenderer.on('` + consts.eventNames.ipcCmdLog + `', function(event, message) {
                 console.log(message)
             });
             ` + (typeof json.windowOptions.custom !== "undefined" && typeof json.windowOptions.custom.script !== "undefined" ? json.windowOptions.custom.script : "") + `
@@ -525,7 +666,10 @@ function windowCreateFinish(json) {
     })
     elements[json.targetID].webContents.on('login', (event, request, authInfo, callback) => {
         event.preventDefault();
-        registerCallback(json, consts.callbackNames.webContentsLogin, {authInfo: authInfo, request: request}, consts.eventNames.webContentsEventLogin, callback);
+        registerCallback(json, consts.callbackNames.webContentsLogin, {
+            authInfo: authInfo,
+            request: request
+        }, consts.eventNames.webContentsEventLogin, callback);
     })
     elements[json.targetID].webContents.on('will-navigate', (event, url) => {
         client.write(json.targetID, consts.eventNames.windowEventWillNavigate, {
@@ -560,7 +704,9 @@ function executeCallback(k, json, args) {
 
 function sessionCreate(webContents, sessionId) {
     elements[sessionId] = webContents.session
-    elements[sessionId].on('will-download', () => { client.write(sessionId, consts.eventNames.sessionEventWillDownload) })
+    elements[sessionId].on('will-download', () => {
+        client.write(sessionId, consts.eventNames.sessionEventWillDownload)
+    })
 }
 
 function getLastWindow() {

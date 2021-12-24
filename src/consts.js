@@ -6,6 +6,7 @@ module.exports = {
         webContentsMessage: "web.contents.message",
     },
     eventNames: {
+        dialog: "app.cmd.dialog",
         appCmdQuit: "app.cmd.quit",
         appEventReady: "app.event.ready",
         appEventSecondInstance: "app.event.second.instance",
