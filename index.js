@@ -106,6 +106,7 @@ function onReady() {
                     case "showOpenDialog": {
                         dialog.showOpenDialog(cmd).then(function(v) {
                             v["tag"] = cmd['tag']
+                            v["open"] = true
                             client.write(json.targetID, consts.eventNames.windowEventMessage, {
                                 message: {
                                     Name: "DialogResp",
@@ -118,6 +119,7 @@ function onReady() {
                 case "showSaveDialog": {
                     dialog.showSaveDialog(cmd).then(function(v) {
                         v["tag"] = cmd['tag']
+                        v["open"] = false
                         client.write(json.targetID, consts.eventNames.windowEventMessage, {
                             message: {
                                 Name: "DialogResp",
