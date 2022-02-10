@@ -22,6 +22,7 @@ let counters = {};
 let elements = {};
 let windowOptions = {};
 let menus = {};
+let dialogShown = false;
 let quittingApp = false;
 
 // Single instance
@@ -104,9 +105,14 @@ function onReady() {
                 };
                 switch (cmd["dialog"]) {
                     case "showOpenDialog": {
+                        if (dialogShown) {
+                            return
+                        }
+                        dialogShown = true
                         dialog.showOpenDialog(cmd).then(function(v) {
                             v["tag"] = cmd['tag']
                             v["open"] = true
+                            dialogShown = false
                             client.write(json.targetID, consts.eventNames.windowEventMessage, {
                                 message: {
                                     Name: "DialogResp",
